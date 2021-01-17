@@ -2,6 +2,7 @@ import { StatusCodes } from 'http-status-codes'
 import { Validator } from 'jsonschema'
 import { insertStock } from '../validate/stock_validate'
 import db from '../db/connect'
+import { query } from 'express-validator'
 const StockController = {
     getProductByID(req, res) {
         db.query('select p.id,p.barcode,p.name,p.count ,p.price,c.id as categories_id,c.category_name from products p left join categories c on c.id=p.category_id WHERE p.id =? and p.is_delete=0', req.params.id, function(error, result) {
@@ -130,8 +131,48 @@ const StockController = {
                 res.status(StatusCodes.CREATED).send({ id: id })
             }
         })
+    },
+    addOrderDetail(req, res) {
+        var jsondata = req.body;
+        var values = [];
+        var order_id = req.body[0].order_id
+        db.beginTransaction(function(err) {
+            if (err) {
+                res.status(StatusCodes.BAD_REQUEST).send({ message: error.message })
+                return
+            }
+            for (var i = 0; i < jsondata.length; i++) {
+                values.push([jsondata[i].product_id, jsondata[i].order_id, jsondata[i].count, jsondata[i].price]);
+                var product_id = jsondata[i].product_id
+                var counts = jsondata[i].count
+                db.query(`call updateProductCount (${product_id},${counts})`, (error, result) => {
+                    if (error) {
+                        db.rollback(function() {
+                            res.status(StatusCodes.BAD_REQUEST).send({ message: error.message })
+                            return
+                        })
+                    }
+                })
+            }
+            db.query('insert into `order_detail` (product_id,order_id,count,price) VALUES ?', [values], (error, result) => {
+                if (error) {
+                    db.rollback(function() {
+                        res.status(StatusCodes.BAD_REQUEST).send({ message: error.message })
+                        return
+                    })
+                }
+            })
+            db.commit(function(err) {
+                if (err) {
+                    db.rollback(function() {
+                        res.status(StatusCodes.BAD_REQUEST).send({ message: error.message })
+                        return
+                    })
+                }
+            })
+        })
+        res.status(StatusCodes.CREATED).send({ order_id: order_id })
     }
-
 }
 
 export default StockController

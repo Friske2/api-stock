@@ -18,4 +18,7 @@ export default function stock(app) {
     app.post('/api/v1/order', StockController.addOrder)
     app.delete('/api/v1/order/:id', StockController.cancelOrder)
 
+    //order detail
+    app.post('/api/v1/order_detail', StockController.addOrderDetail)
+
 }
